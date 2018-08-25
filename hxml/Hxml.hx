@@ -7,6 +7,7 @@ using StringTools;
 abstract Hxml(Array<Arg>) from Array<Arg> to Array<Arg>
 {
     static var typeRegex = ~/(([a-z]|\d|_)+\.)*[A-Z]\w*/;
+    
     /** A list of possible arguments, extracted from "haxe -help" by a macro **/
     static var possibleArgs = ArgMacro.createArgArray();
     /** A list of possible targets, extracted from "haxe -help" by a macro **/
@@ -49,6 +50,46 @@ abstract Hxml(Array<Arg>) from Array<Arg> to Array<Arg>
         
         this = result;
     }
+    
+    /**
+        Resolves all library dependencies.
+    **/
+    public inline function resolveLibraries(tolerant:Bool = false)
+    {
+        var result = new Hxml();
+        
+        for (arg in this) {
+            switch (arg) {
+                case StandardArg("-lib", lib),
+                     StandardArg("-L", lib),
+                     StandardArg("--library", lib):
+                    
+                    if (lib == null || lib.length == 0) continue;
+                    
+                    var proc = new sys.io.Process("haxelib", ["path", lib[0]]);
+                    var data = proc.stdout.readAll().toString().split("\n");
+                    proc.close();
+                    for (d in data)
+                    {
+                        if (d.indexOf("-D") == 0)
+                        {
+                            d = d.substr(2).ltrim();
+                            var idx:Int = d.indexOf("=");
+                            if (idx != -1) d = d.substr(0, idx).rtrim();
+                            if (lib[0].toLowerCase() != d.toLowerCase())
+                            {
+                                result.push(Arg.StandardArg("-lib", [d]));
+                            }
+                        }
+                    }
+                    result.push(arg);
+                default:
+                    result.push(arg);
+            }
+        }
+        this = result;
+    }
+    
     #end
     
     /**
@@ -91,8 +132,11 @@ abstract Hxml(Array<Arg>) from Array<Arg> to Array<Arg>
         
         for (arg in this) {
             switch (arg) {
-                case StandardArg("-lib", lib) if (lib != null && lib.length > 0):
-                    libs.push(lib[0]);
+                case StandardArg("-lib", lib),
+                     StandardArg("-L", lib),
+                     StandardArg("--library", lib):
+                    if (lib != null && lib.length > 0)
+                        libs.push(lib[0]);
                 default:
             }
         }
@@ -132,7 +176,7 @@ abstract Hxml(Array<Arg>) from Array<Arg> to Array<Arg>
         
         for (arg in this) {
             switch (arg) {
-                case StandardArg(target, path) if (possibleArgs.indexOf(target) != -1 && path != null && path.length > 0):
+                case StandardArg(target, path) if (possibleTargets.indexOf(target) != -1 && path != null && path.length > 0):
                     targets.push({
                         target: target,
                         path: path[0]
@@ -194,7 +238,8 @@ abstract Hxml(Array<Arg>) from Array<Arg> to Array<Arg>
                 hxml.push(Module(arg.arg));
             }
             else if (!tolerant && line != "") {
-                throw "Invalid argument on line " + i;
+                trace(possibleArgs);
+                throw "Invalid argument on line " + i + ": " + arg.arg + " " + arg.params.join(" ");
             }
         }
         
