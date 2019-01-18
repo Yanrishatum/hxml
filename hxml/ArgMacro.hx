@@ -50,7 +50,7 @@ class ArgMacro
     
     macro public static function createTargetArray() : ExprOf<Array<String>>
     {
-        var targetReg:EReg = ~/Target\r?\n((?:.*\r?\n)+)Compilation\r?\n/gm;
+        var targetReg:EReg = ~/Target:?\r?\n((?:.*\r?\n)+)Compilation:?\r?\n/gm;
         var regex = ~/(?:,\s|^\s\s)(-?-*[\w;-]*)/gm;
         var targets = [];
         
